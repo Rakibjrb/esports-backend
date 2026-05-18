@@ -51,10 +51,6 @@ esports-backend/
 │   │   └── constants.ts             # Global constants (Roles, Currencies, Statuses)
 │   ├── app.ts              # Express application configuration
 │   └── server.ts           # Server entry point, HTTP bootstrap
-├── tests/                  # Integration & unit test suites
-│   ├── integration/
-│   ├── unit/
-│   └── setup.ts            # Test environment bootstrap script
 ├── .env.example
 ├── tsconfig.json
 ├── package.json
@@ -373,171 +369,56 @@ Allows a Moderator or Admin to approve/reject deposit and withdrawal requests.
 
 ---
 
-## 5. Verification & Testing Strategy
+### 4.4 POST `/api/auth/forgot-password`
+Initiates a secure password reset sequence. Dispatches instructions using user-enumeration mitigations.
 
-To guarantee the reliability of atomic sessions and financial safety, tests are run locally against an isolated environment mirroring a production environment.
-
-### 5.1 Local Integration Testing Infrastructure
-
-We will utilize **Jest** as our test runner and **Supertest** for making HTTP assertions. The backend routes will be run against a localized database instance to verify database queries and transaction states.
-
-```
-                    +-----------------------------+
-                    |        Test Suite           |
-                    | (Jest + Supertest Runner)   |
-                    +--------------+--------------+
-                                   |
-                     Runs requests | against routes
-                                   v
-                    +--------------+--------------+
-                    |    Express Backend Routes   |
-                    |   (With active Middlewares) |
-                    +--------------+--------------+
-                                   |
-                     Performs ACID | sessions & queries
-                                   v
-                    +--------------+--------------+
-                    |  MongoDB In-Memory Replica  |
-                    |    Set (Transactions ON)    |
-                    +-----------------------------+
-```
-
-### 5.2 Local MongoDB Replica Set Setup for Transactions
-
-Because MongoDB ACID transactions **require a Replica Set environment** to execute session operations (such as `session.startTransaction()`), standard standalone local MongoDB instances will fail. 
-
-We resolve this by using `mongodb-memory-server` in the integration test environment or running a local lightweight replica set via Docker Compose:
-
-#### `tests/setup.ts` - Local In-Memory Replica Set Hook:
-```typescript
-import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import mongoose from 'mongoose';
-
-let replSet: MongoMemoryReplSet;
-
-export const connectTestDatabase = async () => {
-  // Spawn a local in-memory 3-node MongoDB Replica Set
-  replSet = await MongoMemoryReplSet.create({
-    replSet: { storageEngine: 'ephemeralForTest', count: 3 }
-  });
-  
-  const uri = replSet.getUri();
-  
-  await mongoose.connect(uri, {
-    connectTimeoutMS: 5000,
-  });
-};
-
-export const disconnectTestDatabase = async () => {
-  await mongoose.disconnect();
-  await replSet.stop();
-};
-```
-```
+*   **Request Payload:**
+    ```json
+    {
+      "email": "player.one@ffairdrop.gg"
+    }
+    ```
+*   **Response Payload (`200 OK`):**
+    ```json
+    {
+      "success": true,
+      "message": "If an account is associated with this email, a password reset link has been dispatched."
+    }
+    ```
 
 ---
 
-### 5.3 Concurrency & Race-Condition Test Suite
+### 4.5 POST `/api/auth/reset-password`
+Resets a user's password using a valid, non-expired cryptographic token.
 
-To prove the tournament registration engine handles race conditions successfully, write an integration test that simulates multiple concurrent users attempting to register.
-
-#### `tests/integration/tournament-concurrency.test.ts`
-```typescript
-import request from 'supertest';
-import mongoose from 'mongoose';
-import app from '../../src/app';
-import User from '../../src/models/user.model';
-import Tournament from '../../src/models/tournament.model';
-import { connectTestDatabase, disconnectTestDatabase } from '../setup';
-
-describe('Tournament Registration Race Conditions', () => {
-  beforeAll(async () => await connectTestDatabase());
-  afterAll(async () => await disconnectTestDatabase());
-
-  it('should successfully handle concurrent registrations without exceeding max capacity', async () => {
-    // 1. Setup a tournament with only 3 open slots and an entry fee of 50 BDT
-    const tournament = await Tournament.create({
-      title: "Clash of Champions (Atomic Limit Test)",
-      entryFee: 50,
-      maxSlots: 3,
-      participants: [],
-      status: "UPCOMING"
-    });
-
-    // 2. Create 10 mock users, each with a wallet balance of 100 BDT
-    const users = [];
-    const tokens = [];
-    
-    for (let i = 0; i < 10; i++) {
-      const uniqueUser = await User.create({
-        username: `proPlayer_${i}`,
-        email: `player_${i}@gmail.com`,
-        passwordHash: "hashPasswordVal",
-        role: "PLAYER",
-        wallet: { balance: 100, currency: "BDT" }
-      });
-      users.push(uniqueUser);
-      
-      // Simulate JWT creation token
-      const mockToken = generateMockToken(uniqueUser);
-      tokens.push(mockToken);
+*   **Request Payload:**
+    ```json
+    {
+      "token": "40_character_hexadecimal_token_string",
+      "password": "NewSecretPassword99!"
     }
-
-    // 3. Fire all 10 registration requests concurrently using Promise.all
-    const promises = tokens.map((token) => 
-      request(app)
-        .post('/api/tournaments/join')
-        .set('Cookie', [`token=${token}`])
-        .send({ tournamentId: tournament._id.toString() })
-    );
-
-    const responses = await Promise.all(promises);
-
-    // 4. Extract statuses from parallel outcomes
-    const successfulJoins = responses.filter(res => res.status === 200);
-    const rejectedJoins = responses.filter(res => res.status === 409); // Conflict (Full)
-
-    // 5. Hard Assertions
-    // Ensure EXACTLY 3 users successfully joined (maxSlots limit)
-    expect(successfulJoins.length).toBe(3);
-    
-    // Ensure the other 7 requests were rejected gracefully
-    expect(rejectedJoins.length).toBe(7);
-
-    // 6. Verify Database Invariants
-    const updatedTournament = await Tournament.findById(tournament._id);
-    expect(updatedTournament?.participants.length).toBe(3);
-
-    // Ensure all 7 rejected players were NOT charged, and their balances remain 100
-    const successfulUserIds = successfulJoins.map(res => res.body.data.registrationId); // Assuming matching tracking
-    const allDbUsers = await User.find({ _id: { $in: users.map(u => u._id) } });
-
-    let successfulChargeCount = 0;
-    let unaffectedRefundCount = 0;
-
-    for (const dbUser of allDbUsers) {
-      if (dbUser.wallet.balance === 50) {
-        successfulChargeCount++;
-      } else if (dbUser.wallet.balance === 100) {
-        unaffectedRefundCount++;
+    ```
+*   **Response Payload (`200 OK`):**
+    ```json
+    {
+      "success": true,
+      "message": "Password reset successful. You may now log in with your new credentials."
+    }
+    ```
+*   **Error Response Payload (`400 Bad Request` - Expired/Invalid Token):**
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "INVALID_OR_EXPIRED_RESET_TOKEN",
+        "message": "The password reset token is invalid, expired, or has already been used."
       }
     }
-
-    expect(successfulChargeCount).toBe(3);
-    expect(unaffectedRefundCount).toBe(7);
-  });
-});
-
-// Mock helper function for testing environment JWTs
-function generateMockToken(user: any): string {
-  // Implement a fast token signer mapped to JWT utility
-  return require('../../src/services/auth.service').signToken(user._id, user.role);
-}
-```
+    ```
 
 ---
 
-## 6. Development Integration Directives
+## 5. Development Integration Directives
 
 For execution agents and developers creating code components based on this blueprint:
 1. **Never bypass the Service Layer:** Express routes call controllers, controllers call services, and services interact with schemas.

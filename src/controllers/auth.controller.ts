@@ -4,6 +4,7 @@ import { sendResponse } from '../utils/sendResponse';
 import { env } from '../config/env';
 import { User } from '../schemas/user.schema';
 import { NotFoundError } from '../utils/errors';
+import logger from '../config/logger';
 
 export class AuthController {
   /**
@@ -122,6 +123,66 @@ export class AuthController {
         statusCode: 200,
         success: true,
         message: 'Logged out successfully.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Generates reset token and dispatches secure mock reset instructions.
+   * Leverages robust defensive designs to mitigate User Enumeration leaks.
+   */
+  public static forgotPassword = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { email } = req.body;
+
+      try {
+        const rawToken = await AuthService.generatePasswordResetToken(email);
+
+        // Log safe mock dispatch instructions locally for development/test checks
+        logger.info(`📧 [MOCK EMAIL DISPATCH] Reset link sent to ${email}: http://localhost:8001/reset-password?token=${rawToken}`);
+      } catch (error) {
+        // Suppress NotFoundError to prevent account enumeration leaks, but re-throw database or schema errors
+        if (error instanceof NotFoundError) {
+          logger.warn(`⚠️ Password reset attempted for non-registered email: ${email}`);
+        } else {
+          throw error;
+        }
+      }
+
+      // Always return a neutral 200 OK success message for security
+      sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: 'If an account is associated with this email, a password reset link has been dispatched.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Validates matching token lifecycle and updates user's login password.
+   */
+  public static resetPassword = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { token, password } = req.body;
+
+      await AuthService.resetPassword(token, password);
+
+      sendResponse(res, {
+        statusCode: 200,
+        success: true,
+        message: 'Password reset successful. You may now log in with your new credentials.',
       });
     } catch (error) {
       next(error);

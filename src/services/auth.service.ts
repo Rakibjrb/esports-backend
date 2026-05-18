@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { User } from '../schemas/user.schema';
 import { env } from '../config/env';
-import { BadRequestError, UnauthorizedError, ConflictError } from '../utils/errors';
+import { BadRequestError, UnauthorizedError, ConflictError, NotFoundError } from '../utils/errors';
 import { IUser, UserRole } from '../interfaces/user.interface';
 import { IJWTPayload } from '../interfaces/auth.interface';
 
@@ -58,7 +59,7 @@ export class AuthService {
     });
 
     await newUser.save();
-    
+
     // Discard passwordHash from returned mongoose entity object
     const returnedUser = newUser.toObject();
     delete (returnedUser as any).passwordHash;
@@ -93,6 +94,58 @@ export class AuthService {
       user: returnedUser as unknown as IUser,
       token,
     };
+  }
+
+  /**
+   * Generates a secure, cryptographically random password reset token
+   * and saves its SHA-256 hash in the database along with its 1-hour expiration time.
+   */
+  public static async generatePasswordResetToken(email: string): Promise<string> {
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      throw new NotFoundError('No user account associated with this email address.', 'EMAIL_NOT_FOUND');
+    }
+
+    // Generate a raw cryptographically secure token (40 hex chars)
+    const rawToken = crypto.randomBytes(20).toString('hex');
+
+    // Hash the token using SHA-256 before storing it in the database for supreme security
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    user.passwordResetToken = hashedToken;
+    user.passwordResetExpires = new Date(Date.now() + 3600000); // Expires in exactly 1 hour
+
+    await user.save();
+
+    return rawToken;
+  }
+
+  /**
+   * Hashes the raw incoming reset token, validates its presence and lifespan,
+   * hashes the new password, updates the player credentials, and wipes the reset locks.
+   */
+  public static async resetPassword(token: string, newPassword: string): Promise<void> {
+    // Re-hash the raw incoming token to search for the secure DB match
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: new Date() },
+    }).select('+passwordResetToken +passwordResetExpires');
+
+    if (!user) {
+      throw new BadRequestError(
+        'The password reset token is invalid, expired, or has already been used.',
+        'INVALID_OR_EXPIRED_RESET_TOKEN'
+      );
+    }
+
+    // Update player credentials (triggers Mongoose's pre-save auto-hashing hook)
+    user.passwordHash = newPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+
+    await user.save();
   }
 }
 
