@@ -65,6 +65,11 @@ The implementation plan is split into **5 sequential phases**. Each phase focuse
 +-----------------+-----------------+
                   |
                   v
++-----------------+-----------------+
+| Phase 3: Wallet Ledger, Deposit   |
+| Pipeline & Moderator Manual       |
+| Gateway                           |
++-----------------+-----------------+
 ```
 
 ### Phase 1: Environment Setup, Database Init & Core Config
@@ -86,6 +91,18 @@ The implementation plan is split into **5 sequential phases**. Each phase focuse
        * `POST /api/auth/reset-password` (Secure credential overrides)
        * `GET /api/auth/me` (Active player profile query)
     3. Route protection middlewares (`authenticateUser`, `authorizeRoles(['ADMIN', 'MODERATOR'])`).
+
+### Phase 3: Wallet Ledger, Deposit Pipeline & Moderator Manual Gateway
+
+The integration of Phase 3 bridges the gap between player-initiated financial events and trusted administrative oversight. Since **ffairdrop** utilizes a manual payment gateway (e.g., bKash, Nagad, Rocket) to process entry fees and distribute rewards, the system cannot rely on automated webhooks. Instead, it architecture-locks all balance top-ups using an **Asynchronous Ledger-with-Review** pattern.
+
+##### Operational Workflow
+- 3.1. **The Ingestion Pipeline:** When a player transfers funds externally, they submit the metadata (Amount, Method, and TxnID) to `/api/wallet/deposit`. The system enforces strict schema validation and instantly locks the `txnId` in the database under a `PENDING` state. This prevents race conditions where the same TxnID could be double-submitted by malicious actors.
+- 3.2. **The Isolation Barrier:** At this stage, the player's wallet balance remains untouched. The funds are mathematically isolated in the `Transaction` collection, preventing unauthorized access to tournament slots before manual verification.
+- 3.3. **The Verification & ACID Commit:** A moderator reviews the physical payment ledger against the dashboard (`GET /api/moderator/transactions`). Upon invoking the approval mutation, the system initiates a native MongoDB Session. The business logic executes atomically: the transaction status scales to `APPROVED`, and the user's `wallet.balance` increments simultaneously. If either operation fails or encounters network drops, the database rolls back completely to prevent ledger mismatch.
+
+This pattern minimizes financial risk, establishes strict audit trails for operational staff, and guarantees data consistency across the entire infrastructure.
+
 
 ---
 
