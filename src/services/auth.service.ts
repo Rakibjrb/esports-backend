@@ -8,18 +8,29 @@ import { IJWTPayload } from '../interfaces/auth.interface';
 
 export class AuthService {
   /**
-   * Signs a secure JSON Web Token for the user session
+   * Signs a short-lived access JSON Web Token for the user session
    */
   public static signToken(userId: string, role: UserRole): string {
     return jwt.sign(
       { userId, role } as IJWTPayload,
       env.JWT_SECRET,
-      { expiresIn: env.JWT_EXPIRES_IN }
+      { expiresIn: env.JWT_ACCESS_EXPIRES_IN }
     );
   }
 
   /**
-   * Decodes and validates session JWT tokens
+   * Signs a long-lived refresh JSON Web Token
+   */
+  public static signRefreshToken(userId: string, role: UserRole): string {
+    return jwt.sign(
+      { userId, role } as IJWTPayload,
+      env.JWT_REFRESH_SECRET,
+      { expiresIn: env.JWT_REFRESH_EXPIRES_IN }
+    );
+  }
+
+  /**
+   * Decodes and validates session access JWT tokens
    */
   public static verifyToken(token: string): IJWTPayload {
     try {
@@ -27,6 +38,18 @@ export class AuthService {
       return decoded;
     } catch (error) {
       throw new UnauthorizedError('Session expired or invalid token. Please log in again.', 'TOKEN_EXPIRED');
+    }
+  }
+
+  /**
+   * Decodes and validates long-lived refresh JWT tokens
+   */
+  public static verifyRefreshToken(token: string): IJWTPayload {
+    try {
+      const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET) as IJWTPayload;
+      return decoded;
+    } catch (error) {
+      throw new UnauthorizedError('Session expired or invalid refresh token. Please log in again.', 'TOKEN_EXPIRED');
     }
   }
 
@@ -70,7 +93,7 @@ export class AuthService {
   /**
    * Core service to authenticate users checking credential matches
    */
-  public static async loginUser(email: string, passwordHash: string): Promise<{ user: IUser; token: string }> {
+  public static async loginUser(email: string, passwordHash: string): Promise<{ user: IUser; token: string; refreshToken: string }> {
     // 1. Fetch user matching email, explicitly selecting the passwordHash field
     const user = await User.findOne({ email: email.toLowerCase() }).select('+passwordHash');
     if (!user) {
@@ -83,16 +106,23 @@ export class AuthService {
       throw new BadRequestError('Invalid credentials matching this password.', 'INVALID_CREDENTIALS');
     }
 
-    // 3. Generate secure JWT token
+    // 3. Generate secure access & refresh tokens
     const token = this.signToken(user._id.toString(), user.role);
+    const refreshToken = this.signRefreshToken(user._id.toString(), user.role);
 
-    // Discard passwordHash from the returned user document
+    // 4. Save hashed refresh token to the database for maximum session security
+    user.refreshToken = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    await user.save();
+
+    // Discard sensitive properties from the returned user document
     const returnedUser = user.toObject();
     delete (returnedUser as any).passwordHash;
+    delete (returnedUser as any).refreshToken;
 
     return {
       user: returnedUser as unknown as IUser,
       token,
+      refreshToken,
     };
   }
 

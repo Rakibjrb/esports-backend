@@ -15,40 +15,33 @@ We adopt a **Clean Architecture with Decoupled Services** pattern. The backend l
 esports-backend/
 ├── src/
 │   ├── config/             # Centralized config (DB, Redis, Logger, JWT)
-│   │   ├── database.ts     # MongoDB/Mongoose connection with replica set support
+│   │   ├── database.ts     # MongoDB/Mongoose connection settings
 │   │   ├── env.ts          # Strictly validated environment variables (using Zod)
-│   │   ├── redis.ts        # Redis client initialization for rate-limiting and queues
-│   │   └── logger.ts       # Winston/Morgan structured logger setup
+│   │   ├── logger.ts       # Winston/Morgan structured logger setup
+│   │   └── redis.ts        # Redis client initialization for rate-limiting
 │   ├── controllers/        # Express controllers (extract params, call services, format responses)
-│   │   ├── auth.controller.ts
-│   │   ├── tournament.controller.ts
-│   │   ├── transaction.controller.ts
-│   │   └── match.controller.ts
+│   │   └── auth.controller.ts       # Registration, login, logout, password resets, token rotation
+│   ├── interfaces/         # Centralized TypeScript interface structures
+│   │   ├── auth.interface.ts        # JWT token payload signatures
+│   │   └── user.interface.ts        # Player entity models & wallet fields
 │   ├── middlewares/        # Express reusable middlewares
 │   │   ├── auth.middleware.ts       # JWT authentication and user injection
 │   │   ├── rbac.middleware.ts       # Role-Based Access Control checks
-│   │   ├── validation.middleware.ts # express-validator input sanitizers
-│   │   └── error.middleware.ts      # Global centralized error handler
-│   ├── models/             # Mongoose schemas, types, and document interfaces
-│   │   ├── user.model.ts            # User and Wallet Schema
-│   │   ├── tournament.model.ts      # Tournament metadata, slots, and rules Schema
-│   │   ├── transaction.model.ts     # Ledger system for deposits, entry-fees, and payouts Schema
-│   │   └── match.model.ts           # Matches, brackets, and score sheets Schema
+│   │   ├── validation.middleware.ts # Input validation handler
+│   │   └── error.middleware.ts      # Global centralized JSON exception handler
 │   ├── routes/             # Express API routing tables
-│   │   ├── auth.routes.ts
-│   │   ├── tournament.routes.ts
-│   │   ├── transaction.routes.ts
-│   │   └── match.routes.ts
-│   ├── services/           # Core domain logic (decoupled from Express req/res)
-│   │   ├── auth.service.ts          # Password hashing, token generation
-│   │   ├── tournament.service.ts    # Bracket math, team check-ins, atomic joins
-│   │   └── transaction.service.ts   # Ledger entries, payment processing
-│   ├── jobs/               # Background queue tasks (BullMQ)
-│   │   ├── processors/              # Queue consumer worker logic
-│   │   └── queues.ts                # Queue publishers (e.g., bracket generation)
+│   │   └── auth.routes.ts           # Authentication & token endpoints
+│   ├── schemas/            # Database storage schemas (Mongoose)
+│   │   └── user.schema.ts           # Player database attributes & hooks
+│   ├── services/           # Decoupled core business domain logic layers
+│   │   └── auth.service.ts          # Password cryptography, login validations, session builders
+│   ├── smtp/               # Operational mailing infrastructure (Nodemailer)
+│   │   └── mailer.ts                # Premium esports-themed responsive HTML template dispatch
 │   ├── utils/              # Generic utility functions and custom errors
-│   │   ├── errors.ts                # Custom Error classes (AppError, NotFoundError)
-│   │   └── constants.ts             # Global constants (Roles, Currencies, Statuses)
+│   │   ├── errors.ts                # Custom Error classes (AppError, NotFoundError, UnauthorizedError)
+│   │   └── sendResponse.ts          # Standardized JSend response formatter
+│   ├── validators/         # Input schema validation pipelines
+│   │   └── auth.validator.ts        # Express validators for register/login/forgot/reset fields
 │   ├── app.ts              # Express application configuration
 │   └── server.ts           # Server entry point, HTTP bootstrap
 ├── .env.example
@@ -56,64 +49,6 @@ esports-backend/
 ├── package.json
 └── README.md
 ```
-
-### 1.2 Frontend Directory Structure (Next.js App Router + TypeScript)
-
-```
-esports-frontend/
-├── src/
-│   ├── app/                # App Router Page tree
-│   │   ├── (auth)/         # Grouped route: authentication flows
-│   │   │   ├── login/
-│   │   │   │   └── page.tsx
-│   │   │   └── register/
-│   │   │       └── page.tsx
-│   │   ├── (dashboard)/    # Grouped route: authenticated user views
-│   │   │   ├── player/
-│   │   │   │   └── page.tsx
-│   │   │   ├── moderator/
-│   │   │   │   └── page.tsx
-│   │   │   └── admin/
-│   │   │       └── page.tsx
-│   │   ├── tournaments/    # Public tournament browsing and details
-│   │   │   ├── page.tsx
-│   │   │   └── [id]/
-│   │   │       └── page.tsx
-│   │   ├── layout.tsx      # Root layout (provides Redux providers and global nav)
-│   │   ├── page.tsx        # Storefront / Landing Page
-│   │   └── providers.tsx   # Aggregates Redux Provider and SWR/Query Cache Providers
-│   ├── components/         # Modular React Components
-│   │   ├── ui/             # Atomic components (Button, Input, Badge, Dialog)
-│   │   ├── layout/         # Navigation, Sidebar, Footer components
-│   │   └── tournament/     # Domain-specific components (BracketView, ParticipantList)
-│   ├── store/              # Redux Toolkit (RTK) Global State Management
-│   │   ├── index.ts        # Redux Store configuration and middleware setup
-│   │   ├── hooks.ts        # Typed dispatch/selector custom hooks (useAppDispatch, useAppSelector)
-│   │   └── slices/         # Slices managing specific domain states
-│   │       ├── authSlice.ts        # Active authentication session and user state slice
-│   │       ├── tournamentSlice.ts  # Selected tournament, match bracket status, and polling state slice
-│   │       └── uiSlice.ts          # Global UI alerts, modals, sidebar visibility slice
-│   ├── hooks/              # Reusable custom React hooks
-│   │   ├── useAuth.ts      # Connects login/logout actions and authentication state from Redux
-│   │   └── useFetch.ts     # Custom wrapper for fetch API
-│   ├── services/           # Backend API integration layer
-│   │   ├── api.client.ts   # Axios/Fetch custom client with credentials support
-│   │   └── endpoints/      # Structured API call functions mapped to endpoints
-│   ├── styles/             # Global CSS and theme/tokens mapping
-│   │   └── globals.css     # Glassmorphism, animations, and premium color tokens
-│   ├── types/              # Domain-specific TypeScript models
-│   │   └── index.ts        # Reusable common interfaces
-│   └── utils/              # Reusable utility files (formatters, helpers)
-│       └── helpers.ts
-├── public/                 # Static assets (logos, fallback covers, icons)
-├── .env.example
-├── next.config.js
-├── tsconfig.json
-├── package.json
-└── README.md
-```
-
----
 
 ## 2. Step-by-Step Implementation Roadmap
 
@@ -130,19 +65,6 @@ The implementation plan is split into **5 sequential phases**. Each phase focuse
 +-----------------+-----------------+
                   |
                   v
-+-----------------+-----------------+
-| Phase 3: Ledger & Payments        |
-+-----------------+-----------------+
-                  |
-                  v
-+-----------------+-----------------+
-| Phase 4: Tournament Atomic Engine |
-+-----------------+-----------------+
-                  |
-                  v
-+-----------------+-----------------+
-| Phase 5: Brackets & Polling Sync  |
-+-----------------------------------+
 ```
 
 ### Phase 1: Environment Setup, Database Init & Core Config
@@ -151,10 +73,6 @@ The implementation plan is split into **5 sequential phases**. Each phase focuse
     2. Strictly typed configuration parser (`src/config/env.ts`) using Zod.
     3. Mongoose connection module with built-in retry-logic, handling replica set parameters.
     4. Centrally structured Winston logger.
-*   **What and how to test/verify:**
-    *   Verify that database connections fail gracefully on timeout.
-    *   Verify environment parser crashes process early with detailed constraint failures if `.env` is incomplete.
-    *   Write a basic integration test (`tests/integration/db.test.ts`) that spawns the DB and asserts connection establishment.
 
 ### Phase 2: Authentication, Role-Based Access Control (RBAC) & User Management
 *   **What to build first:**
@@ -162,64 +80,13 @@ The implementation plan is split into **5 sequential phases**. Each phase focuse
     2. `/api/auth/register` and `/api/auth/login` handlers. Password hashing via `bcrypt`.
     3. JWT issuance helper that writes secure, HTTPOnly, Signed, SameSite cookies.
     4. Route protection middlewares (`authenticateUser`, `authorizeRoles(['ADMIN', 'MODERATOR'])`).
-*   **What and how to test/verify:**
-    *   Unit tests checking correct hashing of passwords and rejecting weak credentials.
-    *   Integration tests verifying JWT signature validation.
-    *   Access tests proving that players receive `403 Forbidden` responses when querying administrative routes.
 
-### Phase 3: Ledger, Payments & Transaction Verification Flows
-*   **What to build first:**
-    1. Core `Transaction` schema to act as a double-entry financial ledger (types: `DEPOSIT`, `WITHDRAWAL`, `ENTRY_FEE`, `PRIZE_PAYOUT`).
-    2. Deposit endpoint `/api/payments/deposit` generating a pending transaction with a uniquely identified `txnId`.
-    3. Moderator verification dashboard endpoint (`PATCH /api/moderator/transactions/:id`) allowing approvals or rejections of manual deposits, crediting/debiting user wallet balances.
-*   **What and how to test/verify:**
-    *   Test double-spending and duplicate transaction submissions.
-    *   Assert that transitioning a transaction status from `PENDING` to `APPROVED` dynamically increments user balance inside an isolated unit test.
-    *   Test validation failures when attempting to update transaction IDs that do not exist or are already settled.
-
-### Phase 4: Tournaments, Atomic Registration Engine & Multi-Player Join Flows
-*   **What to build first:**
-    1. `Tournament` schema containing status (`UPCOMING`, `ACTIVE`, `COMPLETED`), `entryFee`, `prizePool`, `maxSlots`, and `participants` tracking.
-    2. The core atomic endpoint `/api/tournaments/join` wrapping participant addition and balance deduction inside a **MongoDB Session Transaction**.
-    3. Built-in concurrency validation (guaranteeing that registration is aborted and wallet balance rolled back if tournament slots fill up mid-transaction).
-*   **What and how to test/verify:**
-    *   Write concurrency tests executing 100 simultaneous join requests to a 10-slot tournament.
-    *   Verify that wallet deductions roll back completely if a player joins a tournament that reaches maximum capacity during execution.
-    *   Verify that players with insufficient funds are rejected immediately without acquiring session locks.
-
-### Phase 5: Bracket Generation, Dynamic Polling Sync & Production Polish
-*   **What to build first:**
-    1. Bracket generation algorithms (Single elimination match scheduling) triggered when tournament status transitions from `UPCOMING` to `ACTIVE`.
-    2. Background task runners (using BullMQ) to safely schedule match bracket updates and handle potential high-CPU workloads.
-    3. HTTP-based client-side polling sync mechanisms using React Query or SWR to periodically fetch match status and bracket updates from the player screens at optimal intervals (e.g., every 15-30 seconds with exponential backoff on page inactivity).
-    4. Next.js dashboard UI styling with customized glassmorphism CSS templates, responsive layouts, and visual status graphs.
-*   **What and how to test/verify:**
-    *   Assert correctness of bracket generation math for non-power-of-two participant arrays (handling "byes").
-    *   Verify request debouncing and query caching to prevent server overload during parallel pulling.
-    *   Validate End-to-End browser flow under low-bandwidth simulation.
-
----
-
-## 3. Security & Edge-Case Audit Matrix
-
-Below is the architectural matrix identifying vulnerabilities, impacts, and the concrete programmatic solutions implemented in ffairdrop.
-
-| Vulnerability ID | Scenario & Edge-Case | Impact | Programmatic Mitigation Strategy | Implementation Details |
-| :--- | :--- | :--- | :--- | :--- |
-| **SEC-001** | **Race Condition during Tournament Registration**<br><br>Multiple players request to join a tournament at the exact same millisecond. | Slots over-allocated (e.g. 18 players joined a 16-slot limit tournament). User balances debited but no slot is available, creating inconsistency. | Implement MongoDB ACID Transactions with explicit Read/Write session contexts. Query `slotsLeft` and lock documents dynamically inside a session before executing updates. | Use Mongoose `session.withTransaction()` context. Re-verify slots and execute updates atomically inside the session. If `currentParticipants.length >= maxSlots`, abort transaction. |
-| **SEC-002** | **Duplicate Transaction ID Submission**<br><br>Malicious player submits the same payment Gateway Transaction ID (`txnId`) multiple times. | Replay attack resulting in double-crediting user wallets for a single actual payment. | Create a **compound unique index** on the database. Combine it with a distributed short-term Redis execution lock. | Mongoose Schema level: `transactionSchema.index({ txnId: 1, gateway: 1 }, { unique: true })`. On API call, lock the `txnId` key in Redis using `NX PX 10000` (10s expiry). |
-| **SEC-003** | **Bypassing Access Controls / ID Mutation**<br><br>Players modify request parameters (e.g., changing user IDs in headers or query parameters) to perform actions. | Administrative API access bypass; players manually altering game scores or approving deposits. | Strict JWT extraction from signed HttpOnly cookies. Reject user-supplied IDs from client payloads for operations targeting the authenticated user's profile. | Rely solely on `req.user.id` appended by JWT middleware. Define Role-based Access checking middleware `checkRole(['ADMIN', 'MODERATOR'])` executing strict checks. |
-| **SEC-004** | **NoSQL Injection / JSON Parameter Attacks**<br><br>Attacker passes raw MongoDB operators (e.g., `{"username": {"$ne": null}}`) in login fields. | Authentication bypass, exposing unauthorized collections and data leaks. | Input Sanitization and Schema validation. Avoid passing raw request payloads directly into Mongoose operations. | Use `express-validator` to enforce strict schema types. Avoid `User.findOne(req.body)`. Use: `User.findOne({ email: req.body.email })` to discard unexpected operators. |
-| **SEC-005** | **Race Condition during Wallet Withdrawal**<br><br>A player triggers two identical withdrawal API requests in parallel. | Double-withdrawal. User drains wallet below zero because both requests read active balance prior to updates. | Execute atomic balance deductions directly inside MongoDB using relative database operations (e.g., `$inc`), coupled with positive-balance pre-conditions. | Write updates with filter query condition: `User.updateOne({ _id: userId, balance: { $gte: withdrawalAmount } }, { $inc: { balance: -withdrawalAmount } })`. Verify `nModified === 1`. |
-
----
-
-## 4. API Endpoint Contracts (Specifications)
+# API Endpoint Contracts (Specifications)
 
 Below are the strictly typed JSON specifications for mission-critical endpoints.
 
-### 4.1 POST `/api/auth/login`
-Authenticates a user and issues JWT inside a secure HttpOnly cookie.
+### 1 POST `/api/auth/login`
+Authenticates a user and issues dual secure HttpOnly session cookies (Access Token + Refresh Token).
 
 *   **Request Payload:**
     ```json
@@ -230,14 +97,15 @@ Authenticates a user and issues JWT inside a secure HttpOnly cookie.
     ```
 *   **Response Headers:**
     ```http
-    Set-Cookie: token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=86400
+    Set-Cookie: token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVC...; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=900
+    Set-Cookie: refreshToken=eyJhbGciOiJIUzI1NiIsInR5c...; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=604800
     Content-Type: application/json
     ```
 *   **Response Payload (`200 OK`):**
     ```json
     {
       "success": true,
-      "message": "Authentication successful",
+      "message": "Authentication successful. Welcome to ffairdrop!",
       "data": {
         "user": {
           "id": "6648df479b1836109c0bfd91",
@@ -265,111 +133,37 @@ Authenticates a user and issues JWT inside a secure HttpOnly cookie.
 
 ---
 
-### 4.2 POST `/api/tournaments/join`
-Atomic tournament registration endpoint deducting entry fee and listing user.
+### 2 POST `/api/auth/refresh-token`
+Rotates the short-lived session access token using a valid, matching, long-lived refresh token. Employs gold-standard Refresh Token Rotation (RTR).
 
-*   **Authentication:** Requires valid JWT cookie. Role: `PLAYER`.
-*   **Request Payload:**
-    ```json
-    {
-      "tournamentId": "6648e0259b1836109c0bfda5"
-    }
+*   **Authentication:** Requires valid `refreshToken` HttpOnly cookie.
+*   **Response Headers:**
+    ```http
+    Set-Cookie: token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVC...; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=900
+    Set-Cookie: refreshToken=eyJhbGciOiJIUzI1NiIsInR5c...; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=604800
+    Content-Type: application/json
     ```
 *   **Response Payload (`200 OK`):**
     ```json
     {
       "success": true,
-      "message": "Successfully registered for the tournament.",
-      "data": {
-        "registrationId": "6648e04b9b1836109c0bfdaf",
-        "tournament": {
-          "id": "6648e0259b1836109c0bfda5",
-          "title": "Ffairdrop Master Cup 2026",
-          "slotsFilled": 12,
-          "maxSlots": 16
-        },
-        "wallet": {
-          "previousBalance": 10,
-          "currentBalance": 0,
-          "entryFeeDeducted": 10,
-          "currency": "BDT"
-        }
-      }
+      "message": "Access token successfully rotated."
     }
     ```
-*   **Error Response Payload (`409 Conflict` - Tournament Full):**
+*   **Error Response Payload (`401 Unauthorized` - Token Expired/Revoked/Replayed):**
     ```json
     {
       "success": false,
       "error": {
-        "code": "TOURNAMENT_FULL",
-        "message": "Registration failed. All tournament slots have been filled."
-      }
-    }
-    ```
-*   **Error Response Payload (`402 Payment Required` - Insufficient Funds):**
-    ```json
-    {
-      "success": false,
-      "error": {
-        "code": "INSUFFICIENT_FUNDS",
-        "message": "Registration failed. Wallet balance is insufficient to pay the entry fee of 10 BDT."
+        "code": "TOKEN_EXPIRED",
+        "message": "Session expired or invalid refresh token. Please log in again."
       }
     }
     ```
 
 ---
 
-### 4.3 PATCH `/api/moderator/transactions/:id`
-Allows a Moderator or Admin to approve/reject deposit and withdrawal requests.
-
-*   **Authentication:** Requires valid JWT cookie. Role: `MODERATOR` or `ADMIN`.
-*   **URI Path parameter:** `id` represents the MongoDB transaction ObjectId.
-*   **Request Payload:**
-    ```json
-    {
-      "status": "APPROVED",
-      "reason": "Payment verified via Bkash/Rocket reference: #99283."
-    }
-    ```
-*   **Response Payload (`200 OK`):**
-    ```json
-    {
-      "success": true,
-      "message": "Transaction processing complete. Wallet status updated successfully.",
-      "data": {
-        "transaction": {
-          "id": "6648e11a9b1836109c0bfdb8",
-          "userId": "6648df479b1836109c0bfd91",
-          "type": "DEPOSIT",
-          "amount": 500,
-          "status": "APPROVED",
-          "txnId": "GATEWAY-TXN-88231",
-          "moderatorNotes": "Payment verified via Bkash/Rocket reference: #99283.",
-          "processedAt": "2026-05-18T13:10:37.000Z"
-        },
-        "userWallet": {
-          "userId": "6648df479b1836109c0bfd91",
-          "updatedBalance": 510,
-          "currency": "BDT"
-        }
-      }
-    }
-    ```
-*   **Error Response Payload (`400 Bad Request` - Already Processed):**
-    ```json
-    {
-      "success": false,
-      "error": {
-        "code": "TRANSACTION_ALREADY_SETTLED",
-        "message": "Cannot modify status. This transaction has already been APPROVED."
-      }
-    }
-    ```
-
----
-
-### 4.4 POST `/api/auth/forgot-password`
+### 3 POST `/api/auth/forgot-password`
 Initiates a secure password reset sequence. Dispatches instructions using user-enumeration mitigations.
 
 *   **Request Payload:**
@@ -388,7 +182,7 @@ Initiates a secure password reset sequence. Dispatches instructions using user-e
 
 ---
 
-### 4.5 POST `/api/auth/reset-password`
+### 4 POST `/api/auth/reset-password`
 Resets a user's password using a valid, non-expired cryptographic token.
 
 *   **Request Payload:**
@@ -418,7 +212,7 @@ Resets a user's password using a valid, non-expired cryptographic token.
 
 ---
 
-## 5. Development Integration Directives
+# Development Integration Directives
 
 For execution agents and developers creating code components based on this blueprint:
 1. **Never bypass the Service Layer:** Express routes call controllers, controllers call services, and services interact with schemas.

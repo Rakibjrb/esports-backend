@@ -30,6 +30,9 @@ router.post(
 // 3. User Session Logout Route
 router.post('/logout', AuthController.logout);
 
+// 4. Rotate Access & Refresh Tokens Route
+router.post('/refresh-token', AuthController.refreshToken);
+
 // 4. Request Password Reset Link Route
 router.post(
   '/forgot-password',
