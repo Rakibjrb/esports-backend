@@ -7,8 +7,7 @@ export const errorHandler: ErrorRequestHandler = (
   err: Error,
   req: Request,
   res: Response,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  next: NextFunction
+  _next: NextFunction
 ): void => {
   let statusCode = 500;
   let errorCode = 'INTERNAL_ERROR';

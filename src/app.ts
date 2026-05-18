@@ -5,6 +5,7 @@ import { env } from './config/env';
 import { morganMiddleware } from './config/logger';
 import { errorHandler } from './middlewares/error.middleware';
 import { NotFoundError } from './utils/errors';
+import authRouter from './routes/auth.routes';
 
 const app: Express = express();
 
@@ -26,7 +27,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Server health check route
-app.use('/', (req: Request, res: Response) => {
+app.get('/', (_req: Request, res: Response) => {
   res.status(200).json({
     success: true,
     message: 'ffairdrop backend engine is active.',
@@ -35,9 +36,12 @@ app.use('/', (req: Request, res: Response) => {
   });
 });
 
+// API Routes Scaffolding
+app.use('/api/auth', authRouter);
+
 // Capture any unmatched routes as NotFoundExceptions
-app.use((req: Request, res: Response, next) => {
-  next(new NotFoundError(`Route ${req.method} ${req.url} does not exist.`));
+app.use((_req: Request, _res: Response, next) => {
+  next(new NotFoundError(`Route ${_req.method} ${_req.url} does not exist.`));
 });
 
 // Bind centralized JSON error response processor

@@ -1,8 +1,8 @@
-import { MongoMemoryReplicaSet } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 import logger from '../src/config/logger';
 
-let replSet: MongoMemoryReplicaSet;
+let replSet: MongoMemoryReplSet;
 
 // Adjust test execution timeout for handling replica set boot
 jest.setTimeout(60000);
@@ -12,7 +12,7 @@ beforeAll(async () => {
     logger.info('Spawning local In-Memory 3-node MongoDB Replica Set for tests...');
     
     // Spawn a local in-memory 3-node MongoDB Replica Set
-    replSet = await MongoMemoryReplicaSet.create({
+    replSet = await MongoMemoryReplSet.create({
       replSet: { storageEngine: 'ephemeralForTest', count: 3 }
     });
     

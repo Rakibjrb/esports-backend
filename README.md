@@ -249,8 +249,8 @@ Authenticates a user and issues JWT inside a secure HttpOnly cookie.
           "email": "player.one@ffairdrop.gg",
           "role": "PLAYER",
           "wallet": {
-            "balance": 25000,
-            "currency": "USD"
+            "balance": 10,
+            "currency": "BDT"
           }
         }
       }
@@ -293,10 +293,10 @@ Atomic tournament registration endpoint deducting entry fee and listing user.
           "maxSlots": 16
         },
         "wallet": {
-          "previousBalance": 25000,
-          "currentBalance": 20000,
-          "entryFeeDeducted": 5000,
-          "currency": "USD"
+          "previousBalance": 10,
+          "currentBalance": 0,
+          "entryFeeDeducted": 10,
+          "currency": "BDT"
         }
       }
     }
@@ -317,7 +317,7 @@ Atomic tournament registration endpoint deducting entry fee and listing user.
       "success": false,
       "error": {
         "code": "INSUFFICIENT_FUNDS",
-        "message": "Registration failed. Wallet balance is insufficient to pay the entry fee of 5000 USD."
+        "message": "Registration failed. Wallet balance is insufficient to pay the entry fee of 10 BDT."
       }
     }
     ```
@@ -333,7 +333,7 @@ Allows a Moderator or Admin to approve/reject deposit and withdrawal requests.
     ```json
     {
       "status": "APPROVED",
-      "reason": "Payment verified via bank gateway receipt ref: #99283."
+      "reason": "Payment verified via Bkash/Rocket reference: #99283."
     }
     ```
 *   **Response Payload (`200 OK`):**
@@ -346,16 +346,16 @@ Allows a Moderator or Admin to approve/reject deposit and withdrawal requests.
           "id": "6648e11a9b1836109c0bfdb8",
           "userId": "6648df479b1836109c0bfd91",
           "type": "DEPOSIT",
-          "amount": 15000,
+          "amount": 500,
           "status": "APPROVED",
           "txnId": "GATEWAY-TXN-88231",
-          "moderatorNotes": "Payment verified via bank gateway receipt ref: #99283.",
+          "moderatorNotes": "Payment verified via Bkash/Rocket reference: #99283.",
           "processedAt": "2026-05-18T13:10:37.000Z"
         },
         "userWallet": {
           "userId": "6648df479b1836109c0bfd91",
-          "updatedBalance": 35000,
-          "currency": "USD"
+          "updatedBalance": 510,
+          "currency": "BDT"
         }
       }
     }
@@ -410,14 +410,14 @@ We resolve this by using `mongodb-memory-server` in the integration test environ
 
 #### `tests/setup.ts` - Local In-Memory Replica Set Hook:
 ```typescript
-import { MongoMemoryReplicaSet } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 
-let replSet: MongoMemoryReplicaSet;
+let replSet: MongoMemoryReplSet;
 
 export const connectTestDatabase = async () => {
   // Spawn a local in-memory 3-node MongoDB Replica Set
-  replSet = await MongoMemoryReplicaSet.create({
+  replSet = await MongoMemoryReplSet.create({
     replSet: { storageEngine: 'ephemeralForTest', count: 3 }
   });
   
@@ -432,6 +432,7 @@ export const disconnectTestDatabase = async () => {
   await mongoose.disconnect();
   await replSet.stop();
 };
+```
 ```
 
 ---
@@ -454,7 +455,7 @@ describe('Tournament Registration Race Conditions', () => {
   afterAll(async () => await disconnectTestDatabase());
 
   it('should successfully handle concurrent registrations without exceeding max capacity', async () => {
-    // 1. Setup a tournament with only 3 open slots and an entry fee of 50 USD
+    // 1. Setup a tournament with only 3 open slots and an entry fee of 50 BDT
     const tournament = await Tournament.create({
       title: "Clash of Champions (Atomic Limit Test)",
       entryFee: 50,
@@ -463,7 +464,7 @@ describe('Tournament Registration Race Conditions', () => {
       status: "UPCOMING"
     });
 
-    // 2. Create 10 mock users, each with a wallet balance of 100 USD
+    // 2. Create 10 mock users, each with a wallet balance of 100 BDT
     const users = [];
     const tokens = [];
     
@@ -473,7 +474,7 @@ describe('Tournament Registration Race Conditions', () => {
         email: `player_${i}@gmail.com`,
         passwordHash: "hashPasswordVal",
         role: "PLAYER",
-        wallet: { balance: 100, currency: "USD" }
+        wallet: { balance: 100, currency: "BDT" }
       });
       users.push(uniqueUser);
       
