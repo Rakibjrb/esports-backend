@@ -11,6 +11,7 @@ export interface IUser extends Document {
   username: string;
   email: string;
   passwordHash: string;
+  gameUID: number;
   role: UserRole;
   wallet: IWallet;
   passwordResetToken?: string;

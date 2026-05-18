@@ -10,7 +10,8 @@ Registers a new player with a default starter wallet balance of **10 BDT**.
     {
       "username": "PlayerOne",
       "email": "player.one@ffairdrop.gg",
-      "password": "Password123!"
+      "password": "Password123!",
+      "gameUID": 1234567890
     }
     ```
 *   **Response Payload (`201 Created`):**
@@ -23,6 +24,7 @@ Registers a new player with a default starter wallet balance of **10 BDT**.
           "id": "6648df479b1836109c0bfd91",
           "username": "PlayerOne",
           "email": "player.one@ffairdrop.gg",
+          "gameUID": 1234567890,
           "role": "PLAYER",
           "wallet": {
             "balance": 10,
@@ -71,6 +73,7 @@ Authenticates a user and issues dual secure HttpOnly session cookies (Access Tok
           "id": "6648df479b1836109c0bfd91",
           "username": "PlayerOne",
           "email": "player.one@ffairdrop.gg",
+          "gameUID": 1234567890,
           "role": "PLAYER",
           "wallet": {
             "balance": 10,
@@ -205,6 +208,7 @@ Retrieves the profile and wallet balance of the currently authenticated player.
           "id": "6648df479b1836109c0bfd91",
           "username": "PlayerOne",
           "email": "player.one@ffairdrop.gg",
+          "gameUID": 1234567890,
           "role": "PLAYER",
           "wallet": {
             "balance": 10,

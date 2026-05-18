@@ -6,6 +6,8 @@ import { morganMiddleware } from './config/logger';
 import { errorHandler } from './middlewares/error.middleware';
 import { NotFoundError } from './utils/errors';
 import authRouter from './routes/auth.routes';
+import transactionRouter from './routes/transaction.routes';
+import moderatorTransactionRouter from './routes/moderator/transaction.routes';
 
 const app: Express = express();
 
@@ -38,6 +40,8 @@ app.get('/', (_req: Request, res: Response) => {
 
 // API Routes Scaffolding
 app.use('/api/auth', authRouter);
+app.use('/api', transactionRouter);
+app.use('/api/moderator', moderatorTransactionRouter);
 
 // Capture any unmatched routes as NotFoundExceptions
 app.use((_req: Request, _res: Response, next) => {

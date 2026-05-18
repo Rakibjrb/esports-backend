@@ -16,6 +16,11 @@ export const registerValidator = [
   body('password')
     .isLength({ min: 6 })
     .withMessage('Password must be at least 6 characters long.'),
+  body('gameUID')
+    .notEmpty()
+    .withMessage('Game UID is required.')
+    .isInt({ min: 1000000000 })
+    .withMessage('Game UID must be a numeric value and at least 10 digits long.'),
 ];
 
 /**

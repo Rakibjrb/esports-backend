@@ -18,9 +18,9 @@ export class AuthController {
     next: NextFunction
   ): Promise<void> => {
     try {
-      const { username, email, password } = req.body;
+      const { username, email, password, gameUID } = req.body;
 
-      const user = await AuthService.registerUser(username, email, password);
+      const user = await AuthService.registerUser(username, email, password, gameUID);
 
       sendResponse(res, {
         statusCode: 201,
