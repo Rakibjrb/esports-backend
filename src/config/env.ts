@@ -15,6 +15,10 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(8, 'JWT_SECRET must be at least 8 characters long'),
   JWT_EXPIRES_IN: z.coerce.number().default(86400),
   COOKIE_SECURE: z.coerce.boolean().default(false),
+  SMTP_HOST: z.string().min(1, 'SMTP_HOST is required'),
+  SMTP_PORT: z.coerce.number().default(2525),
+  SMTP_USER: z.string().min(1, 'SMTP_USER is required'),
+  SMTP_PASS: z.string().min(1, 'SMTP_PASS is required'),
 });
 
 const result = envSchema.safeParse(process.env);

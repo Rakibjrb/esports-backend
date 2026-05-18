@@ -5,6 +5,7 @@ import { env } from '../config/env';
 import { User } from '../schemas/user.schema';
 import { NotFoundError } from '../utils/errors';
 import logger from '../config/logger';
+import { sendResetPasswordEmail } from '../smtp/mailer';
 
 export class AuthController {
   /**
@@ -143,9 +144,9 @@ export class AuthController {
 
       try {
         const rawToken = await AuthService.generatePasswordResetToken(email);
+        const resetUrl = `${env.CORS_ORIGIN}/reset-password?token=${rawToken}`;
 
-        // Log safe mock dispatch instructions locally for development/test checks
-        logger.info(`📧 [MOCK EMAIL DISPATCH] Reset link sent to ${email}: http://localhost:8001/reset-password?token=${rawToken}`);
+        await sendResetPasswordEmail(email, resetUrl);
       } catch (error) {
         // Suppress NotFoundError to prevent account enumeration leaks, but re-throw database or schema errors
         if (error instanceof NotFoundError) {
