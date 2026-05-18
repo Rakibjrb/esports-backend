@@ -76,16 +76,65 @@ The implementation plan is split into **5 sequential phases**. Each phase focuse
 
 ### Phase 2: Authentication, Role-Based Access Control (RBAC) & User Management
 *   **What to build first:**
-    1. `User` schema definition, featuring embedded `wallet` balances and static `role` structures (`PLAYER`, `MODERATOR`, `ADMIN`).
-    2. `/api/auth/register` and `/api/auth/login` handlers. Password hashing via `bcrypt`.
-    3. JWT issuance helper that writes secure, HTTPOnly, Signed, SameSite cookies.
-    4. Route protection middlewares (`authenticateUser`, `authorizeRoles(['ADMIN', 'MODERATOR'])`).
+    1. `User` schema definition, featuring embedded `wallet` balances (default 10 BDT) and static `role` structures (`PLAYER`, `MODERATOR`, `ADMIN`).
+    2. Secure authentication pipeline registering and verifying users:
+       * `POST /api/auth/register` (Password hashing via `bcrypt`)
+       * `POST /api/auth/login` (Dual Access + Refresh tokens)
+       * `POST /api/auth/logout` (Cookie clearing and token database revocation)
+       * `POST /api/auth/refresh-token` (Refresh Token Rotation)
+       * `POST /api/auth/forgot-password` (SMTP mock password reset email dispatcher)
+       * `POST /api/auth/reset-password` (Secure credential overrides)
+       * `GET /api/auth/me` (Active player profile query)
+    3. Route protection middlewares (`authenticateUser`, `authorizeRoles(['ADMIN', 'MODERATOR'])`).
 
 # API Endpoint Contracts (Specifications)
 
-Below are the strictly typed JSON specifications for mission-critical endpoints.
+Below are the strictly typed JSON specifications for all active authentication endpoints.
 
-### 1 POST `/api/auth/login`
+### 1 POST `/api/auth/register`
+Registers a new player with a default starter wallet balance of **10 BDT**.
+
+*   **Request Payload:**
+    ```json
+    {
+      "username": "PlayerOne",
+      "email": "player.one@ffairdrop.gg",
+      "password": "Password123!"
+    }
+    ```
+*   **Response Payload (`201 Created`):**
+    ```json
+    {
+      "success": true,
+      "message": "Account registered successfully.",
+      "data": {
+        "user": {
+          "id": "6648df479b1836109c0bfd91",
+          "username": "PlayerOne",
+          "email": "player.one@ffairdrop.gg",
+          "role": "PLAYER",
+          "wallet": {
+            "balance": 10,
+            "currency": "BDT"
+          }
+        }
+      }
+    }
+    ```
+*   **Error Response Payload (`409 Conflict` - Email in Use):**
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "EMAIL_ALREADY_EXISTS",
+        "message": "An account with this email address already exists."
+      }
+    }
+    ```
+
+---
+
+### 2 POST `/api/auth/login`
 Authenticates a user and issues dual secure HttpOnly session cookies (Access Token + Refresh Token).
 
 *   **Request Payload:**
@@ -133,7 +182,26 @@ Authenticates a user and issues dual secure HttpOnly session cookies (Access Tok
 
 ---
 
-### 2 POST `/api/auth/refresh-token`
+### 3 POST `/api/auth/logout`
+Securely logs the user out, clearing both session cookies and revoking the refresh token in the database.
+
+*   **Response Headers:**
+    ```http
+    Set-Cookie: token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0
+    Set-Cookie: refreshToken=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0
+    Content-Type: application/json
+    ```
+*   **Response Payload (`200 OK`):**
+    ```json
+    {
+      "success": true,
+      "message": "Logged out successfully."
+    }
+    ```
+
+---
+
+### 4 POST `/api/auth/refresh-token`
 Rotates the short-lived session access token using a valid, matching, long-lived refresh token. Employs gold-standard Refresh Token Rotation (RTR).
 
 *   **Authentication:** Requires valid `refreshToken` HttpOnly cookie.
@@ -163,7 +231,7 @@ Rotates the short-lived session access token using a valid, matching, long-lived
 
 ---
 
-### 3 POST `/api/auth/forgot-password`
+### 5 POST `/api/auth/forgot-password`
 Initiates a secure password reset sequence. Dispatches instructions using user-enumeration mitigations.
 
 *   **Request Payload:**
@@ -182,7 +250,7 @@ Initiates a secure password reset sequence. Dispatches instructions using user-e
 
 ---
 
-### 4 POST `/api/auth/reset-password`
+### 6 POST `/api/auth/reset-password`
 Resets a user's password using a valid, non-expired cryptographic token.
 
 *   **Request Payload:**
@@ -206,6 +274,32 @@ Resets a user's password using a valid, non-expired cryptographic token.
       "error": {
         "code": "INVALID_OR_EXPIRED_RESET_TOKEN",
         "message": "The password reset token is invalid, expired, or has already been used."
+      }
+    }
+    ```
+
+---
+
+### 7 GET `/api/auth/me`
+Retrieves the profile and wallet balance of the currently authenticated player.
+
+*   **Authentication:** Requires valid access JWT cookie (`token`).
+*   **Response Payload (`200 OK`):**
+    ```json
+    {
+      "success": true,
+      "message": "Active user session profile retrieved successfully.",
+      "data": {
+        "user": {
+          "id": "6648df479b1836109c0bfd91",
+          "username": "PlayerOne",
+          "email": "player.one@ffairdrop.gg",
+          "role": "PLAYER",
+          "wallet": {
+            "balance": 10,
+            "currency": "BDT"
+          }
+        }
       }
     }
     ```
