@@ -24,11 +24,18 @@ const userSchema = new Schema<IUser>(
   {
     username: {
       type: String,
+      unique: false,
       required: [true, 'Username is required.'],
-      unique: true,
       trim: true,
       minlength: [3, 'Username must be at least 3 characters long.'],
       maxlength: [30, 'Username cannot exceed 30 characters.'],
+      index: true,
+    },
+    gameUID: {
+      type: Number,
+      required: [true, 'Game UID is required.'],
+      unique: true,
+      min: [1000000000, 'Game UID must be a minimum of 10 digits long.'],
       index: true,
     },
     email: {

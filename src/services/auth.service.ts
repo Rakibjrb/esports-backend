@@ -56,17 +56,22 @@ export class AuthService {
   /**
    * Core service to register a new user in the database
    */
-  public static async registerUser(username: string, email: string, passwordHash: string): Promise<IUser> {
-    // 1. Check if user already exists (by email or username)
+  public static async registerUser(
+    username: string,
+    email: string,
+    passwordHash: string,
+    gameUID: number
+  ): Promise<IUser> {
+    // 1. Check if user already exists (by email or gameUID)
     const existingUser = await User.findOne({
-      $or: [{ email: email.toLowerCase() }, { username }],
+      $or: [{ email: email.toLowerCase() }, { gameUID }],
     });
 
     if (existingUser) {
       const isEmail = existingUser.email === email.toLowerCase();
       throw new ConflictError(
-        isEmail ? 'An account with this email address already exists.' : 'This username is already taken.',
-        isEmail ? 'EMAIL_ALREADY_EXISTS' : 'USERNAME_ALREADY_EXISTS'
+        isEmail ? 'An account with this email address already exists.' : 'This Game UID is already registered by another player.',
+        isEmail ? 'EMAIL_ALREADY_EXISTS' : 'GAME_UID_ALREADY_EXISTS'
       );
     }
 
@@ -75,8 +80,9 @@ export class AuthService {
       username,
       email: email.toLowerCase(),
       passwordHash, // This will be automatically hashed by the Mongoose userSchema pre-save hook
+      gameUID,
       wallet: {
-        balance: 10, // Default starting BDT is 10 on account creation
+        balance: 5, // Default starting BDT is 10 on account creation
         currency: 'BDT',
       },
     });
