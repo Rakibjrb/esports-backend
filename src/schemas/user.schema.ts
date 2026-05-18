@@ -57,6 +57,19 @@ const userSchema = new Schema<IUser>(
       required: true,
       default: () => ({ balance: 10, currency: 'BDT' }),
     },
+    passwordResetToken: {
+      type: String,
+      select: false,
+      index: true,
+    },
+    passwordResetExpires: {
+      type: Date,
+      select: false,
+    },
+    refreshToken: {
+      type: String,
+      select: false,
+    },
   },
   {
     timestamps: true,

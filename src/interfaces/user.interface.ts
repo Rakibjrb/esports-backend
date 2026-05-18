@@ -13,6 +13,9 @@ export interface IUser extends Document {
   passwordHash: string;
   role: UserRole;
   wallet: IWallet;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
+  refreshToken?: string;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(password: string): Promise<boolean>;

@@ -31,3 +31,27 @@ export const loginValidator = [
     .notEmpty()
     .withMessage('Password is required.'),
 ];
+
+/**
+ * Validation rules for password reset request (/api/auth/forgot-password)
+ */
+export const forgotPasswordValidator = [
+  body('email')
+    .trim()
+    .isEmail()
+    .withMessage('Please provide a valid email address.')
+    .normalizeEmail(),
+];
+
+/**
+ * Validation rules for setting a new password (/api/auth/reset-password)
+ */
+export const resetPasswordValidator = [
+  body('token')
+    .trim()
+    .notEmpty()
+    .withMessage('Reset token is required.'),
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters long.'),
+];
